@@ -1,4 +1,3 @@
-export { notesRouter } from './notes'
-export { notebooksRouter } from './notebooks'
+export { docsRouter } from './docs'
 
 

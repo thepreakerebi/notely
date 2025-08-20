@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import { notesRouter, notebooksRouter } from './routes'
+import { docsRouter } from './routes'
 import { connectToDatabase } from './config/db'
 import { env } from './config/env'
 
@@ -13,8 +13,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
 
-app.use('/api/notebooks', notebooksRouter)
-app.use('/api/notes', notesRouter)
+app.use('/api/docs', docsRouter)
 
 async function start() {
   try {
