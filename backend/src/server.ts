@@ -7,7 +7,7 @@ import { env } from './config/env'
 const app = express()
 
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
