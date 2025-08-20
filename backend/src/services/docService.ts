@@ -1,6 +1,7 @@
 import { Types } from 'mongoose'
 import { DocModel } from '../models/Doc'
-import { deleteAsset } from './cloudinaryService'
+import { deleteAsset, deleteAssetGeneric } from './cloudinaryService'
+import { extractAssets } from './contentAssets'
 
 export async function listDocs(parentId?: string) {
   const filter = typeof parentId === 'string' && parentId
@@ -75,6 +76,12 @@ export async function deleteDocCascade(id: string) {
   for (const d of docs) {
     if (d.coverImagePublicId) await deleteAsset(d.coverImagePublicId)
     if (d.iconPublicId) await deleteAsset(d.iconPublicId)
+    if (d.content) {
+      const assets = extractAssets(d.content)
+      for (const a of assets) {
+        await deleteAssetGeneric(a.publicId, a.resourceType)
+      }
+    }
   }
   await DocModel.deleteMany({ _id: { $in: ids } })
   return { count: toDelete.length }

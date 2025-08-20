@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { createDoc, deleteDocCascade, getDoc, listDocs, updateDoc } from '../services/docService'
 import { uploadImage } from '../services/cloudinaryService'
+import { extractAssets, uploadDataUrlsAndAnnotate } from '../services/contentAssets'
 import { createDocSchema, updateDocSchema } from '../validation/docSchemas'
 import { Types } from 'mongoose'
 import { DocModel } from '../models/Doc'
@@ -46,9 +47,10 @@ export function createDocHandler(req: Request, res: Response) {
       iconPublicId = up.publicId
     }
 
+    const processed = await uploadDataUrlsAndAnnotate(content)
     const doc = await createDoc({
       title: normalizedTitle,
-      content,
+      content: processed.content,
       coverImage: coverUrl,
       coverImagePublicId: coverPublicId,
       icon: iconUrl,
@@ -95,7 +97,14 @@ export function updateDocHandler(req: Request, res: Response) {
     if (coverPublicId || iconPublicId) {
       old = await DocModel.findById(id)
     }
-    const doc = await updateDoc(id, { title, content, coverImage: coverUrl, coverImagePublicId: coverPublicId, icon: iconUrl, iconPublicId, parentId })
+    let newContent = content
+    let newContentAssets: ReturnType<typeof extractAssets> = []
+    if (content !== undefined) {
+      const processed = await uploadDataUrlsAndAnnotate(content)
+      newContent = processed.content
+      newContentAssets = processed.assets
+    }
+    const doc = await updateDoc(id, { title, content: newContent, coverImage: coverUrl, coverImagePublicId: coverPublicId, icon: iconUrl, iconPublicId, parentId })
     if (!doc) return res.status(404).json({ message: 'Doc not found' })
     if (old) {
       if (coverPublicId && old.coverImagePublicId && old.coverImagePublicId !== coverPublicId) {
@@ -106,6 +115,16 @@ export function updateDocHandler(req: Request, res: Response) {
       if (iconPublicId && old.iconPublicId && old.iconPublicId !== iconPublicId) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         import('../services/cloudinaryService').then(({ deleteAsset }) => deleteAsset(old.iconPublicId))
+      }
+    }
+    // If content changed, try to remove assets no longer referenced (best effort)
+    if (content !== undefined && old?.content) {
+      const oldAssets = extractAssets(old.content)
+      const newSet = new Set(newContentAssets.map((a) => a.publicId))
+      const toRemove = oldAssets.filter((a) => !newSet.has(a.publicId))
+      for (const a of toRemove) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        import('../services/cloudinaryService').then(({ deleteAssetGeneric }) => deleteAssetGeneric(a.publicId, a.resourceType))
       }
     }
     return res.json(doc)
