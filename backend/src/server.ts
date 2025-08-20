@@ -1,7 +1,8 @@
 import express from 'express'
 import cors from 'cors'
-import { notesRouter } from './routes/notes'
-import { notebooksRouter } from './routes/notebooks'
+import { notesRouter, notebooksRouter } from './routes'
+import { connectToDatabase } from './config/db'
+import { env } from './config/env'
 
 const app = express()
 
@@ -15,11 +16,22 @@ app.get('/health', (_req, res) => {
 app.use('/api/notebooks', notebooksRouter)
 app.use('/api/notes', notesRouter)
 
-const PORT = process.env.PORT || 4000
+async function start() {
+  try {
+    await connectToDatabase()
+    console.log('Connected to database')
+    const port = env.port
+    app.listen(port, () => {
+      // eslint-disable-next-line no-console
+      console.log(`Backend running on http://localhost:${port}`)
+    })
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to start server:', err)
+    process.exit(1)
+  }
+}
 
-app.listen(PORT, () => {
-  // eslint-disable-next-line no-console
-  console.log(`Backend running on http://localhost:${PORT}`)
-})
+void start()
 
 

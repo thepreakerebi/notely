@@ -1,11 +1,18 @@
 import { Request, Response } from 'express'
 import { ApiList } from '../models/types'
-import { store, createNotebook, updateNotebook, deleteNotebook } from '../models/store'
+import { NotebookModel } from '../models/Notebook'
 
 export function listNotebooks(_req: Request, res: Response) {
-  const items = Array.from(store.notebooks.values())
-  const payload: ApiList<typeof items[number]> = { items }
-  res.json(payload)
+  void NotebookModel.find().sort({ createdAt: -1 }).then((docs) => {
+    const items = docs.map((d) => ({
+      id: d._id.toString(),
+      title: d.title,
+      createdAt: d.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      updatedAt: d.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    }))
+    const payload: ApiList<typeof items[number]> = { items }
+    res.json(payload)
+  })
 }
 
 export function getNotebook(req: Request, res: Response) {
@@ -13,9 +20,15 @@ export function getNotebook(req: Request, res: Response) {
   if (typeof id !== 'string' || !id) {
     return res.status(400).json({ message: 'id is required' })
   }
-  const notebook = store.notebooks.get(id)
-  if (!notebook) return res.status(404).json({ message: 'Notebook not found' })
-  res.json(notebook)
+  void NotebookModel.findById(id).then((doc) => {
+    if (!doc) return res.status(404).json({ message: 'Notebook not found' })
+    return res.json({
+      id: doc._id.toString(),
+      title: doc.title,
+      createdAt: doc.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      updatedAt: doc.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    })
+  })
 }
 
 export function createNotebookHandler(req: Request, res: Response) {
@@ -23,8 +36,14 @@ export function createNotebookHandler(req: Request, res: Response) {
   if (!title || typeof title !== 'string') {
     return res.status(400).json({ message: 'title is required' })
   }
-  const notebook = createNotebook(title)
-  res.status(201).json(notebook)
+  void NotebookModel.create({ title }).then((doc) => {
+    return res.status(201).json({
+      id: doc._id.toString(),
+      title: doc.title,
+      createdAt: doc.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      updatedAt: doc.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    })
+  })
 }
 
 export function updateNotebookHandler(req: Request, res: Response) {
@@ -33,9 +52,15 @@ export function updateNotebookHandler(req: Request, res: Response) {
     return res.status(400).json({ message: 'id is required' })
   }
   const { title } = req.body ?? {}
-  const updated = updateNotebook(id, { title })
-  if (!updated) return res.status(404).json({ message: 'Notebook not found' })
-  res.json(updated)
+  void NotebookModel.findByIdAndUpdate(id, { title }, { new: true }).then((doc) => {
+    if (!doc) return res.status(404).json({ message: 'Notebook not found' })
+    return res.json({
+      id: doc._id.toString(),
+      title: doc.title,
+      createdAt: doc.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      updatedAt: doc.updatedAt?.toISOString?.() ?? new Date().toISOString(),
+    })
+  })
 }
 
 export function deleteNotebookHandler(req: Request, res: Response) {
@@ -43,9 +68,10 @@ export function deleteNotebookHandler(req: Request, res: Response) {
   if (typeof id !== 'string' || !id) {
     return res.status(400).json({ message: 'id is required' })
   }
-  const ok = deleteNotebook(id)
-  if (!ok) return res.status(404).json({ message: 'Notebook not found' })
-  res.status(204).send()
+  void NotebookModel.findByIdAndDelete(id).then((doc) => {
+    if (!doc) return res.status(404).json({ message: 'Notebook not found' })
+    return res.status(204).send()
+  })
 }
 
 
